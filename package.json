@@ -1,0 +1,17 @@
+{
+  "name": "ai-interview-system",
+  "version": "1.0.0",
+  "description": "AI-powered interview practice platform",
+  "private": true,
+  "scripts": {
+    "dev": "cd backend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start": "cd backend && npm start",
+    "build": "cd frontend && npm run build",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "postinstall": "npm run install:all"
+  },
+  "keywords": ["interview", "ai", "openai", "fullstack"],
+  "license": "ISC"
+}
