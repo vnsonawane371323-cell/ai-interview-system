@@ -11,12 +11,19 @@ const interviewSessionRoutes = require('./routes/interviewSession');
 const app = express();
 
 // ============ MIDDLEWARE ============
-const allowedOrigins = process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',') 
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
-
 app.use(cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow any localhost port in development
+        if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+        // Allow configured origins
+        if (process.env.CORS_ORIGIN) {
+            const allowed = process.env.CORS_ORIGIN.split(',');
+            if (allowed.includes(origin)) return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+    },
     credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
