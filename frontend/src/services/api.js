@@ -38,20 +38,18 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  register: (userData) => api.post('/auth/register', userData),
-  login: (credentials) => api.post('/auth/login', credentials),
-  test: () => api.get('/auth/test'),
+  register: (data) => api.post('/auth/register', data),
+  login: (data) => api.post('/auth/login', data),
 };
 
 // Interview API
 export const interviewAPI = {
-  getAll: () => api.get('/interviews'),
-  getOne: (id) => api.get(`/interviews/${id}`),
-  create: (data) => api.post('/interviews', data),
-  update: (id, data) => api.put(`/interviews/${id}`, data),
-  delete: (id) => api.delete(`/interviews/${id}`),
-  generateQuestion: (params) => api.post('/interviews/generate-question', params),
-  getStats: () => api.get('/interviews/stats/summary'),
+  start: (data) => api.post('/interview/start', data),
+  submitAnswer: (data) => api.post('/interview/answer', data),
+  complete: (data) => api.post('/interview/complete', data),
+  getReport: (sessionId) => api.get(`/interview/report/${sessionId}`),
+  getHistory: () => api.get('/interview/history'),
+  getStats: () => api.get('/interview/stats'),
 };
 
 export default api;

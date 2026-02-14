@@ -1,52 +1,22 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Interview from './pages/Interview';
+import InterviewRoom from './pages/InterviewRoom';
+import Report from './pages/Report';
 import ProtectedRoute from './components/ProtectedRoute';
 
-function App() {
+export default function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/interview"
-          element={
-            <ProtectedRoute>
-              <Interview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/interview/:id"
-          element={
-            <ProtectedRoute>
-              <Interview />
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Default Route */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
-        {/* Catch All */}
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/interview/:sessionId" element={<ProtectedRoute><InterviewRoom /></ProtectedRoute>} />
+        <Route path="/report/:sessionId" element={<ProtectedRoute><Report /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
-
-export default App;
