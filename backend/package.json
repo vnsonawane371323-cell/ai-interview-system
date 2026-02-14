@@ -7,7 +7,13 @@
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
-  "keywords": ["interview", "ai", "openai", "express", "mongodb"],
+  "keywords": [
+    "interview",
+    "ai",
+    "openai",
+    "express",
+    "mongodb"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -15,6 +21,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

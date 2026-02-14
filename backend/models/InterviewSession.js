@@ -37,9 +37,19 @@ const InterviewSessionSchema = new mongoose.Schema({
     improvements: [String],
     questionScores: [{
       questionIndex: Number,
-      score: Number,
+      overall: Number,
+      communication: Number,
+      confidence: Number,
+      technical: Number,
       feedback: String
-    }]
+    }],
+    aiSuggestions: [{
+      title: String,
+      description: String,
+      priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
+      category: String
+    }],
+    overallFeedback: { type: String, default: '' }
   },
   totalQuestions: {
     type: Number,

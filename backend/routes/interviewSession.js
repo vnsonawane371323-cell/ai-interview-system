@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const InterviewSession = require('../models/InterviewSession');
 const { protect } = require('../middleware/authMiddleware');
-const { generateQuestions, analyzeAnswer, generateReport } = require('../services/analysisService');
+const { generateQuestions, generateReport } = require('../services/analysisService');
 
 // All routes are protected
 router.use(protect);
@@ -90,8 +90,8 @@ router.post('/answer', async (req, res) => {
       session.completed = true;
       session.completedAt = new Date();
 
-      // Generate report
-      const report = generateReport(session.questions, session.answers);
+      // Generate AI report (async)
+      const report = await generateReport(session.questions, session.answers, session.category, session.difficulty);
       session.scores = report;
     }
 
@@ -100,8 +100,9 @@ router.post('/answer', async (req, res) => {
     if (isLastQuestion) {
       return res.json({
         finished: true,
+        completed: true,
         sessionId: session._id,
-        message: 'Interview completed! View your report.',
+        message: 'Interview session completed! Your AI-powered report is ready.',
         report: session.scores
       });
     }
@@ -110,10 +111,11 @@ router.post('/answer', async (req, res) => {
     const nextQuestion = session.questions[nextIdx];
     res.json({
       finished: false,
+      completed: false,
       sessionId: session._id,
       currentQuestion: nextIdx,
       totalQuestions: session.totalQuestions,
-      question: {
+      nextQuestion: {
         text: nextQuestion.text,
         category: nextQuestion.category,
         order: nextIdx
@@ -149,7 +151,7 @@ router.post('/complete', async (req, res) => {
     session.completed = true;
     session.completedAt = new Date();
 
-    const report = generateReport(session.questions, session.answers);
+    const report = await generateReport(session.questions, session.answers, session.category, session.difficulty);
     session.scores = report;
 
     await session.save();
@@ -185,21 +187,18 @@ router.get('/report/:sessionId', async (req, res) => {
     }
 
     res.json({
-      sessionId: session._id,
-      category: session.category,
-      difficulty: session.difficulty,
-      totalQuestions: session.totalQuestions,
-      totalAnswered: session.answers.length,
-      completedAt: session.completedAt,
-      createdAt: session.createdAt,
-      scores: session.scores,
-      questions: session.questions.map((q, i) => ({
-        text: q.text,
-        category: q.category,
-        order: q.order,
-        answer: session.answers.find(a => a.questionIndex === i)?.transcript || '',
-        score: session.scores.questionScores?.find(qs => qs.questionIndex === i) || null
-      }))
+      session: {
+        _id: session._id,
+        category: session.category,
+        difficulty: session.difficulty,
+        totalQuestions: session.totalQuestions,
+        totalAnswered: session.answers.length,
+        completedAt: session.completedAt,
+        createdAt: session.createdAt,
+        scores: session.scores,
+        questions: session.questions,
+        answers: session.answers
+      }
     });
   } catch (err) {
     console.error('Error fetching report:', err);
