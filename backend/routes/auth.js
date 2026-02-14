@@ -4,7 +4,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-env";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // TEST ROUTE
 router.get('/test', (req, res) => {
@@ -73,7 +73,8 @@ router.post('/login', async (req, res) => {
     res.json({
       message: "Login successful",
       token,
-      userId: user._id
+      userId: user._id,
+      name: user.name
     });
 
   } catch (error) {
