@@ -5,10 +5,14 @@ import { interviewAPI } from '../services/api';
 
 const CATEGORIES = [
   { value: 'mixed', label: 'Mixed', icon: '🎯', desc: 'All categories' },
-  { value: 'technical', label: 'Technical', icon: '💻', desc: 'Coding & engineering' },
-  { value: 'behavioral', label: 'Behavioral', icon: '🤝', desc: 'Soft skills' },
-  { value: 'system-design', label: 'System Design', icon: '🏗️', desc: 'Architecture' },
-  { value: 'general', label: 'General', icon: '💼', desc: 'Career topics' },
+  { value: 'dsa', label: 'DSA', icon: '🧮', desc: 'Data Structures & Algorithms' },
+  { value: 'dbms', label: 'DBMS', icon: '🗄️', desc: 'Database Management Systems' },
+  { value: 'cpp', label: 'C/C++', icon: '⚙️', desc: 'Core C/C++ Programming' },
+  { value: 'python', label: 'Python', icon: '🐍', desc: 'Python Programming' },
+  { value: 'webdev', label: 'Web Dev', icon: '🌐', desc: 'HTML, CSS, JS, React, Node' },
+  { value: 'behavioral', label: 'Behavioral', icon: '🤝', desc: 'Soft skills & HR' },
+  { value: 'system-design', label: 'System Design', icon: '🏗️', desc: 'Architecture & Design' },
+  { value: 'general', label: 'General', icon: '💼', desc: 'Career & general topics' },
 ];
 
 const DIFFICULTIES = [
