@@ -1,4 +1,7 @@
 const path = require("path");
+const dns = require("dns");
+// Use Google DNS to avoid SRV lookup failures on some networks
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const mongoose = require("mongoose");
@@ -31,9 +34,49 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// ============ DATABASE CONNECTION (serverless-safe) ============
+let isConnected = false;
+
+const connectDB = async () => {
+    if (isConnected) return;
+
+    const MONGO_URI = process.env.MONGO_URI;
+    if (!MONGO_URI) {
+        console.error("❌ MONGO_URI not set.");
+        throw new Error("MONGO_URI environment variable is not configured");
+    }
+
+    try {
+        await mongoose.connect(MONGO_URI, {
+            serverSelectionTimeoutMS: 10000,
+            socketTimeoutMS: 45000,
+            bufferCommands: false,
+        });
+        isConnected = true;
+        console.log("✅ MongoDB Connected Successfully!");
+    } catch (err) {
+        console.error(`❌ MongoDB Connection Error: ${err.message}`);
+        isConnected = false;
+        throw err;
+    }
+};
+
+// Middleware: ensure DB is connected before handling any API request
+app.use('/api', async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        res.status(500).json({ 
+            message: "Database connection failed", 
+            error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
+        });
+    }
+});
+
 // ============ API ROUTES ============
 app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", message: "AI Interview Backend is Running" });
+    res.json({ status: "ok", message: "AI Interview Backend is Running", dbConnected: isConnected });
 });
 
 // Auth routes
@@ -42,61 +85,29 @@ app.use('/api/auth', authRoutes);
 // Interview session routes (protected)
 app.use('/api/interview', interviewSessionRoutes);
 
-// ============ SERVE FRONTEND IN PRODUCTION ============
-if (process.env.NODE_ENV === 'production') {
+// ============ 404 HANDLER for API routes ============
+app.all('/api/{*splat}', (req, res) => {
+    res.status(404).json({ message: "API route not found" });
+});
+
+// ============ SERVE FRONTEND IN PRODUCTION (local only) ============
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
     app.use(express.static(path.join(__dirname, '../frontend/dist')));
     
     app.get('*', (req, res) => {
         res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
     });
-} else {
+} else if (!process.env.VERCEL) {
     app.get("/", (req, res) => {
         res.json({ message: "AI Interview Backend is Running ✅ (Development Mode)" });
     });
 }
 
-// ============ 404 HANDLER ============
-app.use((req, res) => {
-    res.status(404).json({ message: "Route not found" });
-});
-
 // ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
     console.error("Error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
 });
-
-// ============ DATABASE CONNECTION ============
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-    console.error("❌ MONGO_URI not set. Please add it to your .env file.");
-    process.exit(1);
-}
-
-let retries = 5;
-const connectWithRetry = () => {
-    mongoose.connect(MONGO_URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 5000,
-    })
-    .then(() => {
-        console.log("✅ MongoDB Connected Successfully!");
-        retries = 5;
-    })
-    .catch((err) => {
-        retries -= 1;
-        console.error(`❌ MongoDB Connection Error: ${err.message}`);
-        if (retries > 0) {
-            console.log(`⏳ Retrying in 5 seconds... (${retries} attempts left)`);
-            setTimeout(connectWithRetry, 5000);
-        } else {
-            console.error("❌ Failed to connect to MongoDB after 5 attempts.");
-            process.exit(1);
-        }
-    });
-};
-
-connectWithRetry();
 
 // ============ START SERVER (only when not in serverless mode) ============
 if (!process.env.VERCEL) {

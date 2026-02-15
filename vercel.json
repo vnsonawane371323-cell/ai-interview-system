@@ -6,11 +6,14 @@
   "framework": null,
   "functions": {
     "api/index.js": {
+      "maxDuration": 30,
       "includeFiles": "backend/**"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/health", "destination": "/api" },
+    { "source": "/api/auth/(.*)", "destination": "/api" },
+    { "source": "/api/interview/(.*)", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
