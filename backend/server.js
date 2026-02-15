@@ -1,8 +1,8 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path");
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -17,6 +17,8 @@ app.use(cors({
         if (!origin) return callback(null, true);
         // Allow any localhost port in development
         if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+        // Allow Vercel deployments
+        if (/\.vercel\.app$/.test(origin)) return callback(null, true);
         // Allow configured origins
         if (process.env.CORS_ORIGIN) {
             const allowed = process.env.CORS_ORIGIN.split(',');
@@ -96,11 +98,15 @@ const connectWithRetry = () => {
 
 connectWithRetry();
 
-// ============ START SERVER ============
-const PORT = process.env.PORT || 5000;
+// ============ START SERVER (only when not in serverless mode) ============
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+        console.log(`📡 Routes available at http://localhost:${PORT}/api/auth`);
+    });
+}
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📡 Routes available at http://localhost:${PORT}/api/auth`);
-});
+// Export for Vercel serverless
+module.exports = app;
 
