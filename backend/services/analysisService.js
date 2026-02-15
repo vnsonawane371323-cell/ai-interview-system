@@ -8,16 +8,23 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // ─── Initialize Gemini ────────────────────────────────────────
 let genAI = null;
 let geminiModel = null;
+let geminiKeyPresent = false;
+let lastGeminiError = null; // Track last error reason for better fallback messages
+
+// Model fallback chain — try lighter models first to reduce quota usage
+const GEMINI_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash'];
 
 function initGemini() {
   const key = process.env.GEMINI_API_KEY;
   if (!key || key === '' || key === 'your-gemini-api-key-here') {
+    geminiKeyPresent = false;
     return null;
   }
+  geminiKeyPresent = true;
   if (!genAI) {
     genAI = new GoogleGenerativeAI(key);
-    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    console.log('✅ Gemini AI initialized successfully');
+    geminiModel = genAI.getGenerativeModel({ model: GEMINI_MODELS[0] });
+    console.log(`✅ Gemini AI initialized with model: ${GEMINI_MODELS[0]}`);
   }
   return geminiModel;
 }
@@ -710,7 +717,96 @@ Rules:
       overallFeedback: parsed.overallFeedback || ''
     };
   } catch (err) {
-    console.error('❌ Gemini report generation failed:', err.message);
+    const isQuotaError = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+    const isRateLimit = err.message?.includes('429') || err.message?.includes('rate');
+
+    if (isQuotaError || isRateLimit) {
+      console.error('⚠️ Gemini quota/rate limit exceeded. Trying fallback models...');
+      lastGeminiError = 'quota_exceeded';
+
+      // Try fallback models
+      for (let m = 1; m < GEMINI_MODELS.length; m++) {
+        try {
+          console.log(`🔄 Trying fallback model: ${GEMINI_MODELS[m]}`);
+          const fallbackModel = genAI.getGenerativeModel({ model: GEMINI_MODELS[m] });
+          const result = await fallbackModel.generateContent(prompt);
+          const text = result.response.text().trim();
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) continue;
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log(`✅ Fallback model ${GEMINI_MODELS[m]} succeeded!`);
+          lastGeminiError = null;
+          return {
+            overallScore: Math.min(10, Math.max(1, Number(parsed.overallScore) || 1)),
+            communicationScore: Math.min(10, Math.max(1, Number(parsed.communicationScore) || 1)),
+            confidenceScore: Math.min(10, Math.max(1, Number(parsed.confidenceScore) || 1)),
+            technicalScore: Math.min(10, Math.max(1, Number(parsed.technicalScore) || 1)),
+            strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+            improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+            questionScores: (Array.isArray(parsed.questionScores) ? parsed.questionScores : []).map((qs, i) => ({
+              questionIndex: i,
+              overall: Math.min(10, Math.max(1, Number(qs.overall) || 1)),
+              communication: Math.min(10, Math.max(1, Number(qs.communication) || 1)),
+              confidence: Math.min(10, Math.max(1, Number(qs.confidence) || 1)),
+              technical: Math.min(10, Math.max(1, Number(qs.technical) || 1)),
+              feedback: qs.feedback || ''
+            })),
+            aiSuggestions: (Array.isArray(parsed.aiSuggestions) ? parsed.aiSuggestions : []).map(s => ({
+              title: s.title || '',
+              description: s.description || '',
+              priority: ['high', 'medium', 'low'].includes(s.priority) ? s.priority : 'medium',
+              category: s.category || 'general'
+            })),
+            overallFeedback: parsed.overallFeedback || ''
+          };
+        } catch (fallbackErr) {
+          console.error(`❌ Fallback model ${GEMINI_MODELS[m]} also failed:`, fallbackErr.message);
+        }
+      }
+
+      // All models failed — try once more after a short delay
+      try {
+        console.log('⏳ Waiting 5 seconds before retrying primary model...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const retryModel = genAI.getGenerativeModel({ model: GEMINI_MODELS[0] });
+        const result = await retryModel.generateContent(prompt);
+        const text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log('✅ Retry after delay succeeded!');
+          lastGeminiError = null;
+          return {
+            overallScore: Math.min(10, Math.max(1, Number(parsed.overallScore) || 1)),
+            communicationScore: Math.min(10, Math.max(1, Number(parsed.communicationScore) || 1)),
+            confidenceScore: Math.min(10, Math.max(1, Number(parsed.confidenceScore) || 1)),
+            technicalScore: Math.min(10, Math.max(1, Number(parsed.technicalScore) || 1)),
+            strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+            improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+            questionScores: (Array.isArray(parsed.questionScores) ? parsed.questionScores : []).map((qs, i) => ({
+              questionIndex: i,
+              overall: Math.min(10, Math.max(1, Number(qs.overall) || 1)),
+              communication: Math.min(10, Math.max(1, Number(qs.communication) || 1)),
+              confidence: Math.min(10, Math.max(1, Number(qs.confidence) || 1)),
+              technical: Math.min(10, Math.max(1, Number(qs.technical) || 1)),
+              feedback: qs.feedback || ''
+            })),
+            aiSuggestions: (Array.isArray(parsed.aiSuggestions) ? parsed.aiSuggestions : []).map(s => ({
+              title: s.title || '',
+              description: s.description || '',
+              priority: ['high', 'medium', 'low'].includes(s.priority) ? s.priority : 'medium',
+              category: s.category || 'general'
+            })),
+            overallFeedback: parsed.overallFeedback || ''
+          };
+        }
+      } catch (retryErr) {
+        console.error('❌ Retry after delay also failed:', retryErr.message);
+      }
+    } else {
+      console.error('❌ Gemini report generation failed:', err.message);
+      lastGeminiError = 'api_error';
+    }
     return null;
   }
 }
@@ -773,7 +869,7 @@ function localGenerateReport(questions, answers) {
     ],
     overallFeedback: answeredCount === 0
       ? 'You did not answer any questions in this session. Please attempt all questions to receive a meaningful analysis.'
-      : `You answered ${answeredCount} out of ${count} questions. ${answeredCount < count ? 'Try to attempt every question for a complete evaluation.' : 'Good job attempting all questions!'} Configure your Gemini API key for personalized AI-powered feedback.`
+      : `You answered ${answeredCount} out of ${count} questions. ${answeredCount < count ? 'Try to attempt every question for a complete evaluation.' : 'Good job attempting all questions!'} ${lastGeminiError === 'quota_exceeded' ? 'Note: Gemini AI quota is temporarily exceeded. This analysis was generated locally. AI-powered feedback will resume when quota resets.' : !geminiKeyPresent ? 'Configure your Gemini API key in .env for AI-powered feedback.' : 'This analysis was generated using local evaluation.'}`
   };
 }
 
@@ -787,7 +883,11 @@ async function generateReport(questions, answers, category, difficulty) {
     console.log('✅ AI report generated via Gemini');
     return aiReport;
   }
-  console.log('⚠️ Falling back to local analysis (check GEMINI_API_KEY in .env)');
+  if (!geminiKeyPresent) {
+    console.log('⚠️ Falling back to local analysis — no GEMINI_API_KEY in .env');
+  } else {
+    console.log('⚠️ Falling back to local analysis — Gemini API error (quota or other issue)');
+  }
   return localGenerateReport(questions, answers);
 }
 
